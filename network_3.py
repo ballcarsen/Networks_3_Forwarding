@@ -138,7 +138,7 @@ class Router:
     ##@param name: friendly router name for debugging
     # @param intf_count: the number of input and output interfaces
     # @param max_queue_size: max queue length (passed to Interface)
-    def __init__(self, name, intf_count, max_queue_size, routing_t):
+    def __init__(self, routing_t, name, intf_count, max_queue_size):
         self.stop = False #for thread termination
         self.name = name
         self.routing_t = routing_t
@@ -164,11 +164,20 @@ class Router:
                     # HERE you will need to implement a lookup into the
                     # forwarding table to find the appropriate outgoing interface
                     # for now we assume the outgoing interface is also i
-                    dst = p[:NetworkPacket.dst_addr_S_length]
+                    send_addr = str(p[:NetworkPacket.src_addr_S_length])
+                    dst_addr = str(p[NetworkPacket.src_addr_S_length: NetworkPacket.dst_addr_S_length + NetworkPacket.src_addr_S_length])
 
-                    self.out_intf_L[i].put(p.to_byte_S(), True)
+                    if self.name in self.routing_t.keys():
+                        try:
+                            out_intf_I = self.routing_t[self.name][send_addr]
+                        except KeyError:
+                            out_intf_I = self.routing_t[self.name][dst_addr]
+                    else:
+                        out_intf_I = 0
+
+                    self.out_intf_L[out_intf_I].put(p.to_byte_S(), True)
                     print('%s: forwarding packet "%s" from interface %d to %d with mtu %d' \
-                        % (self, p, i, i, self.out_intf_L[i].mtu))
+                        % (self, p, i, out_intf_I, self.out_intf_L[out_intf_I].mtu))
             except queue.Full:
                 print('%s: packet "%s" lost on interface %d' % (self, p, i))
                 pass
