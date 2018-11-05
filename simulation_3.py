@@ -5,8 +5,6 @@ Created on Oct 12, 2016
 '''
 import network_3
 import link_3
-import network_2
-import link_2
 import threading
 from time import sleep
 
@@ -15,7 +13,7 @@ router_queue_size = 0  # 0 means unlimited
 simulation_time = 1  # give the network sufficient time to transfer all packets before quitting
 
 if __name__ == '__main__':
-    routing_dict = {'router_a': {"00001" : 0, "00002": 1}, 'router_d': {"00003" : 0, "00004": 1}}
+    routing_dict = {'router_a': {"1" : 0, "2": 1}, 'router_d': {"3" : 0, "4": 1}}
 
 
 
@@ -47,7 +45,7 @@ if __name__ == '__main__':
     object_L.append(router_d)
 
     # create a Link Layer to keep track of links between network nodes
-    link_layer = link_2.LinkLayer()
+    link_layer = link_3.LinkLayer()
     object_L.append(link_layer)
 
     # add all the links
@@ -87,6 +85,9 @@ if __name__ == '__main__':
     # create some send events
     for i in range(1):
         host_1.udt_send(1,4,"from 1 to 4")
+        host_2.udt_send(2,4, "from 2 to 4")
+        host_2.udt_send(2,3, "from 2 to 3")
+        host_1.udt_send(1,3, "from 1 to 3")
 
 
     # give the network sufficient time to transfer all packets before quitting

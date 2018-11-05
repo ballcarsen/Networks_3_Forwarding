@@ -100,7 +100,6 @@ class Host:
                 more = 0
             print(more)
             p = NetworkPacket(src_addr, dst_addr, temp_S, more)
-            print("segemented packet %s" % temp_S)
             self.out_intf_L[0].put(p.to_byte_S()) #send packets always enqueued successfully
             print('%s: sending packet "%s" on the out interface with mtu=%d' % (self, p, self.out_intf_L[0].mtu))
             data_S = data_S[self.out_intf_L[0].mtu - NetworkPacket.dst_addr_S_length - NetworkPacket.src_addr_S_length - 1:]
@@ -110,21 +109,28 @@ class Host:
         pkt_S = self.in_intf_L[0].get()
         msg_string = ''
         if pkt_S is not None:
-            src_addr, dst_addr, msg_string, more_packets_S = pkt_S.from_byte_S(pkt_S)
-            return(msg_string, more_packets_S)
+            p = NetworkPacket.from_byte_S(pkt_S)
+            return(p.data_S, p.more_packets_S, p.src_addr)
         else:
-            return('', 1)
+            return('', 1, None)
 
     ## thread target for the host to keep receiving data
     def run(self):
         print (threading.currentThread().getName() + ': Starting\n')
-        msg_S = ''
+
+        message_dict={}
         while True:
             #receive data arriving to the in interface
-            temp_S, more_packets_S = self.udt_receive()
-            msg_S += temp_S
-            if int(more_packets_S) == 0:
-                print('Put messages back together from multiple packets\n message is %s' % msg_S)
+            temp_S, more_packets_S, src_addr = self.udt_receive()
+            if src_addr is not None:
+                try:
+                    msg_s = message_dict[src_addr]
+                    message_dict[src_addr] = msg_s + temp_S
+                except KeyError:
+                    message_dict[src_addr] = temp_S
+                if int(more_packets_S) == 0:
+                    print('message received %s\n' % message_dict[src_addr])
+                    message_dict[src_addr] = ''
             #terminate
             if(self.stop):
                 print (threading.currentThread().getName() + ': Ending')
@@ -160,18 +166,16 @@ class Router:
                 pkt_S = self.in_intf_L[i].get()
                 #if packet exists make a forwarding decision
                 if pkt_S is not None:
-                    p = NetworkPacket.from_byte_S(pkt_S) #parse a packet out
+
+                    p = NetworkPacket.from_byte_S(pkt_S)#parse a packet out
                     # HERE you will need to implement a lookup into the
                     # forwarding table to find the appropriate outgoing interface
                     # for now we assume the outgoing interface is also i
-                    send_addr = str(p[:NetworkPacket.src_addr_S_length])
-                    dst_addr = str(p[NetworkPacket.src_addr_S_length: NetworkPacket.dst_addr_S_length + NetworkPacket.src_addr_S_length])
-
                     if self.name in self.routing_t.keys():
                         try:
-                            out_intf_I = self.routing_t[self.name][send_addr]
+                            out_intf_I = self.routing_t[self.name][str(p.src_addr)]
                         except KeyError:
-                            out_intf_I = self.routing_t[self.name][dst_addr]
+                            out_intf_I = self.routing_t[self.name][str(p.dst_addr)]
                     else:
                         out_intf_I = 0
 
@@ -179,7 +183,7 @@ class Router:
                     print('%s: forwarding packet "%s" from interface %d to %d with mtu %d' \
                         % (self, p, i, out_intf_I, self.out_intf_L[out_intf_I].mtu))
             except queue.Full:
-                print('%s: packet "%s" lost on interface %d' % (self, p, i))
+                print('%s: packet "%s" lost on interface %d' % (self, pkt_S, i))
                 pass
 
     ## thread target for the host to keep forwarding data
